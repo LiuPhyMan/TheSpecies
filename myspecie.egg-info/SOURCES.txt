@@ -1,0 +1,7 @@
+setup.py
+myspecie/__init__.py
+myspecie.egg-info/PKG-INFO
+myspecie.egg-info/SOURCES.txt
+myspecie.egg-info/dependency_links.txt
+myspecie.egg-info/requires.txt
+myspecie.egg-info/top_level.txt
