@@ -1,3 +1,5 @@
+LICENSE
+README.md
 setup.py
 myspecie/__init__.py
 myspecie.egg-info/PKG-INFO
