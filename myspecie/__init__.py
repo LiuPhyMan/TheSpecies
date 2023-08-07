@@ -10,7 +10,7 @@ import re
 import numpy as np
 from scipy.interpolate import interp1d
 from pandas import read_csv
-from myconst import relM2absM, eV2K, K2J, K2eV, absM2relM, m_e
+from myconst import relM2absM, eV2K, eV2J, K2J, K2eV, absM2relM, m_e, k as kB
 
 __all__ = ["spec_df", "SpecieWithLevel", "SpecieWithQint", "spc_dict"]
 
@@ -23,7 +23,7 @@ class AbsSpecie(object):
     def __init__(self, *, spc_str: str) -> None:
         assert spc_str in spec_df.index, spc_str
         self.relM = spec_df.loc[spc_str, "relM"]
-        self.absM = self.relM * relM2absM
+        self.absM = self.relM*relM2absM
         self.Zc = spec_df.loc[spc_str, "Zc"]
         self.Hf = spec_df.loc[spc_str, "Hf"]
         self.elems = {_[0]: int(_[1]) for _ in re.findall(r"([a-zA-Z]+)-(\d+)",
@@ -37,6 +37,7 @@ class AbsSpecie(object):
 
     def qint(self, T_K):
         pass
+
 
 class _Electron(AbsSpecie):
 
@@ -52,7 +53,11 @@ class _Electron(AbsSpecie):
 
     def rdcd_mu0(self, *, T_K):
         r""" \mu(T) / kT  or \mu(T)/RT"""
-        return 3.66487052 - 1.5 * log(self.relM) - 2.5 * log(T_K) - log(2)
+        return 3.66487052 - 1.5*log(self.relM) - 2.5*log(T_K) - log(2)
+
+    def get_h(self, *, T_K):
+        return 2.5 * kB * T_K
+
 
 class SpecieWithLevel(AbsSpecie):
 
@@ -65,25 +70,28 @@ class SpecieWithLevel(AbsSpecie):
         self.E = _data[:, 1]
 
     def qint(self, T_K: float):
-        return np.dot(self.g, np.exp(-self.E * eV2K / T_K))
+        return np.dot(self.g, np.exp(-self.E*eV2K/T_K))
 
     def lnqint(self, T_K: float):
         return log(self.qint(T_K))
 
     def dlnqintdT(self, T_K: float):
-        T_eV = T_K * K2eV
-        return (T_K * self.qint(T_K)) ** (-1) * np.dot(self.g,
-                                                       self.E / T_eV * np.exp(-self.E / T_eV))
+        T_eV = T_K*K2eV
+        return (T_K*self.qint(T_K))**(-1)*np.dot(self.g,
+                                                 self.E/T_eV*np.exp(-self.E/T_eV))
 
     def dlnqintdT_2(self, T_K: float):
-        T_eV = T_K * K2eV
-        temp = np.dot(self.g * self.E / T_eV *
-                      (-2 + self.E / T_eV), np.exp(-self.E / T_eV))
-        return (T_K * self.qint(T_K)) ** (-1) / T_K * temp
+        T_eV = T_K*K2eV
+        temp = np.dot(self.g*self.E/T_eV*
+                      (-2 + self.E/T_eV), np.exp(-self.E/T_eV))
+        return (T_K*self.qint(T_K))**(-1)/T_K*temp
 
     def rdcd_mu0(self, *, T_K):
-        return 3.66487052 - 1.5 * log(self.relM) - 2.5 * log(T_K) - log(self.qint(T_K)) \
-            + self.Hf * eV2K / T_K
+        return 3.66487052 - 1.5*log(self.relM) - 2.5*log(T_K) - log(self.qint(T_K)) \
+            + self.Hf*eV2K/T_K
+
+    def get_h(self, *, T_K: float):
+        return 2.5*kB*T_K + kB*T_K**2*self.dlnqintdT(T_K) + self.Hf*eV2J
 
 
 class SpecieWithQint(AbsSpecie):
@@ -101,16 +109,22 @@ class SpecieWithQint(AbsSpecie):
         return float(interp1d(self._data[:, 0], self._data[:, 2])(T_K))
 
     def dlnqintdT(self, T_K: float):
-        return float(interp1d(self._data[:, 0], self._data[:, 3])(T_K) / T_K)
+        return float(interp1d(self._data[:, 0], self._data[:, 3])(T_K)/T_K)
 
     def dlnqintdT_2(self, T_K: float):
         dlnqdT = self.dlnqintdT(T_K)
         return float((interp1d(self._data[:, 0],
-                               self._data[:, 4])(T_K) - 2 * T_K * dlnqdT) / T_K ** 2)
+                               self._data[:, 4])(T_K) - 2*T_K*dlnqdT)/T_K**2)
 
     def rdcd_mu0(self, *, T_K: float):
-        return 3.66487052 - 1.5 * log(self.relM) - 2.5 * log(T_K) - log(self.qint(T_K)) + \
-            self.Hf * eV2K / T_K
+        return 3.66487052 - 1.5*log(self.relM) - 2.5*log(T_K) - log(self.qint(T_K)) + \
+            self.Hf*eV2K/T_K
+
+    def get_h(self, *, T_K: float):
+        return 2.5*kB*T_K + kB*T_K**2*self.dlnqintdT(T_K) + self.Hf*eV2J
+
+    # def cp(self, T_K: float):
+    #     return 2.5 + 2 * T_K * self.dlnqintdT(T_K) + T_K**2 * self.dlnqintdT_2(T_K)
 
 
 with open(__path__[0] + r"/spec_info.txt") as f:
@@ -128,7 +142,6 @@ for _str in spec_info[:10]:
         spc_dict[_key].set_qint(qint_file=f"{__path__[0]}/data/{_path}")
     else:
         raise Exception(f"The type {_type} is error.")
-
 
 # spc_dict = dict()
 # for _str in _spc_info:
