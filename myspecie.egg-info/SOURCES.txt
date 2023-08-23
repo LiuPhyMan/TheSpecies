@@ -2,6 +2,7 @@ LICENSE
 README.md
 setup.py
 myspecie/__init__.py
+myspecie/line.py
 myspecie.egg-info/PKG-INFO
 myspecie.egg-info/SOURCES.txt
 myspecie.egg-info/dependency_links.txt

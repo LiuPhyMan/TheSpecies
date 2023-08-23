@@ -5,12 +5,14 @@
 @time: 23.May.2023
 """
 
-from math import log
 import re
+from math import log, pi
+
 import numpy as np
-from scipy.interpolate import interp1d
+from myconst import relM2absM, eV2K, eV2J, K2eV, hbar, k as kB, light_c
 from pandas import read_csv
-from myconst import relM2absM, eV2K, eV2J, K2J, K2eV, absM2relM, m_e, k as kB
+from scipy.interpolate import interp1d
+from .line import AtomLines
 
 __all__ = ["spec_df", "SpecieWithLevel", "SpecieWithQint", "spc_dict"]
 
@@ -38,12 +40,26 @@ class AbsSpecie(object):
     def qint(self, T_K):
         pass
 
+    def set_emiss_lines(self, *, lineFile):
+        self.lines = AtomLines(lineFile=lineFile)
+
+    def norm_j_bb(self, *, T_K: float, wv_range) -> float:
+        # nu_range = (light_c / wv_range[1], light_c / wv_range[0])
+        df = self.lines.df_filter_by_wv_range(wvlth_range=wv_range)
+        if df.index.size == 0:
+            return 0
+        tmp = np.dot(df["wAg"], np.exp(-df["Ek_eV"]/(T_K*K2eV)))
+        return hbar/4/pi/self.qint(T_K=T_K)*tmp
+
 
 class _Electron(AbsSpecie):
 
     def __init__(self) -> None:
         super().__init__(spc_str="e")
         self.elems = {"e": 1}
+
+    def norm_j_bb(self, *, T_K: float, wv_range) -> float:
+        return 0
 
     def qint(self, T_K):
         return 2
@@ -56,7 +72,7 @@ class _Electron(AbsSpecie):
         return 3.66487052 - 1.5*log(self.relM) - 2.5*log(T_K) - log(2)
 
     def get_h(self, *, T_K):
-        return 2.5 * kB * T_K
+        return 2.5*kB*T_K
 
 
 class SpecieWithLevel(AbsSpecie):
@@ -143,6 +159,16 @@ for _str in spec_info[:10]:
     else:
         raise Exception(f"The type {_type} is error.")
 
+spc_dict["Ar"].set_emiss_lines(lineFile=f"{__path__[0]}/data/line/Ar/Ar I.txt")
+spc_dict["Ar_1p"].set_emiss_lines(lineFile=f"{__path__[0]}/data/line/Ar/Ar II.txt")
+spc_dict["Ar_2p"].set_emiss_lines(lineFile=f"{__path__[0]}/data/line/Ar/Ar III.txt")
+spc_dict["Ar_3p"].set_emiss_lines(lineFile=f"{__path__[0]}/data/line/Ar/Ar IV.txt")
+spc_dict["Ar_4p"].set_emiss_lines(lineFile=f"{__path__[0]}/data/line/Ar/Ar V.txt")
+spc_dict["Xe"].set_emiss_lines(lineFile=f"{__path__[0]}/data/line/Xe/Xe I.txt")
+spc_dict["Xe_1p"].set_emiss_lines(lineFile=f"{__path__[0]}/data/line/Xe/Xe II.txt")
+spc_dict["Xe_2p"].set_emiss_lines(lineFile=f"{__path__[0]}/data/line/Xe/Xe III.txt")
+spc_dict["Xe_3p"].set_emiss_lines(lineFile=f"{__path__[0]}/data/line/Xe/Xe IV.txt")
+spc_dict["Xe_4p"].set_emiss_lines(lineFile=f"{__path__[0]}/data/line/Xe/Xe V.txt")
 # spc_dict = dict()
 # for _str in _spc_info:
 #     if _str[0] == "gE":
