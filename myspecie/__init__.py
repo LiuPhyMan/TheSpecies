@@ -43,9 +43,9 @@ class AbsSpecie(object):
     def set_emiss_lines(self, *, lineFile):
         self.lines = AtomLines(lineFile=lineFile)
 
-    def norm_j_bb(self, *, T_K: float, wv_range) -> float:
+    def norm_j_bb(self, *, T_K: float, wvlnm_rng: tuple) -> float:
         # nu_range = (light_c / wv_range[1], light_c / wv_range[0])
-        df = self.lines.df_filter_by_wv_range(wvlth_range=wv_range)
+        df = self.lines.df_filter_by_wv_range(wvlnm_rng=wvlnm_rng)
         if df.index.size == 0:
             return 0
         tmp = np.dot(df["wAg"], np.exp(-df["Ek_eV"]/(T_K*K2eV)))
@@ -58,7 +58,7 @@ class _Electron(AbsSpecie):
         super().__init__(spc_str="e")
         self.elems = {"e": 1}
 
-    def norm_j_bb(self, *, T_K: float, wv_range) -> float:
+    def norm_j_bb(self, *, T_K: float, wvlnm_rng) -> float:
         return 0
 
     def qint(self, T_K):
