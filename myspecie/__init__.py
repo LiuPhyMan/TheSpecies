@@ -6,30 +6,46 @@
 """
 
 import re
-from math import log, pi
+from math import log
 
 import numpy as np
-from myconst import relM2absM, eV2K, eV2J, K2eV, hbar, k as kB, light_c
+from myconst import relM2absM, eV2K, eV2J, K2eV, hbar, k as kB, allSR
 from pandas import read_csv
 from scipy.interpolate import interp1d
+
 from .line import AtomLines
 
 __all__ = ["spec_df", "SpecieWithLevel", "SpecieWithQint", "spc_dict"]
 
 spec_df = read_csv(__path__[0] + r"/specie_data.csv", sep=",", header=None, index_col=0,
-                   names=["relM", "Zc", "Hf", "elems"], comment="#")
+                   names=["relM", "Zc", "Hf", "ionE", "polar", "elems"], comment="#")
 
 
 class AbsSpecie(object):
+    __slots__ = ["spc_str", "relM", "absM", "Zc", "Hf", "ionE", "polar", "elems", "lines"]
 
     def __init__(self, *, spc_str: str) -> None:
         assert spc_str in spec_df.index, spc_str
+        self.spc_str = spc_str
         self.relM = spec_df.loc[spc_str, "relM"]
         self.absM = self.relM*relM2absM
         self.Zc = spec_df.loc[spc_str, "Zc"]
         self.Hf = spec_df.loc[spc_str, "Hf"]
+        self.ionE = float(spec_df.loc[spc_str, "ionE"]) if not spec_df.loc[
+                                                                   spc_str, "ionE"].strip() == "" else 0
+        self.polar = float(spec_df.loc[spc_str, "polar"]) if not spec_df.loc[
+                                                                     spc_str, "polar"].strip() == "" else 0
         self.elems = {_[0]: int(_[1]) for _ in re.findall(r"([a-zA-Z]+)-(\d+)",
                                                           spec_df.loc[spc_str, "elems"])}
+
+    @property
+    def type(self):
+        if self.Zc == 0:
+            return "neu"
+        if self.Zc > 0:
+            return "ion"
+        if self.Zc < 0:
+            return "negChrg"
 
     def get_nElem(self, element: str):
         if element == "e":
@@ -49,7 +65,7 @@ class AbsSpecie(object):
         if df.index.size == 0:
             return 0
         tmp = np.dot(df["wAg"], np.exp(-df["Ek_eV"]/(T_K*K2eV)))
-        return hbar/4/pi/self.qint(T_K=T_K)*tmp
+        return hbar/self.qint(T_K=T_K)*tmp/allSR
 
 
 class _Electron(AbsSpecie):
@@ -109,6 +125,9 @@ class SpecieWithLevel(AbsSpecie):
     def get_h(self, *, T_K: float):
         return 2.5*kB*T_K + kB*T_K**2*self.dlnqintdT(T_K) + self.Hf*eV2J
 
+    def gnd_frac(self, T_K: float):
+        return self.g[0]/self.qint(T_K)
+
 
 class SpecieWithQint(AbsSpecie):
 
@@ -143,6 +162,7 @@ class SpecieWithQint(AbsSpecie):
     #     return 2.5 + 2 * T_K * self.dlnqintdT(T_K) + T_K**2 * self.dlnqintdT_2(T_K)
 
 
+# =============================================================================================== #
 with open(__path__[0] + r"/spec_info.txt") as f:
     spec_info = f.readlines()
 
