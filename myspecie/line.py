@@ -75,31 +75,31 @@ class AtomLines(object):
 
 # ----------------------------------------------------------------------------------------------- #
 
-class AtomLinesKurucz(object):
-
-    def __init__(self, *, df_file):
-        self.df = pd.read_pickle(df_file)
-
-    def set_wvlnm_rng(self, wvl_nm_l, wvl_nm_u):
-        self.wvlnm_rng = (wvl_nm_l, wvl_nm_u)
-
-    def set_sr(self, sr: float):
-        self.sr = sr
-
-    # def wvl_filter(self, *, wvlnm_rng):
-    # df = self.df[(self.df["wvlnm"] >= wvlnm_rng[0])* (self.df["wvlnm"] <= wvlnm_rng[1])]
-    # return df
-    def set_stark_brdn_DK(self, *, ne: float, T_K: float):
-        _const = 4.4198201551008605e-39
-        self.df["stark_brdn"] = 0
-        for i in self.df.index:
-            if (self.df.loc[i, "wvlnm"] < self.wvlnm_rng[0]) or (self.df.loc[i, "wvlnm"] >
-                                                                 self.wvlnm_rng[1]):
-                continue
-            else:
-                prtb = self.df.loc[i, "prtb_u"] + self.df.loc[i, "prtb_l"]
-                tmp = _const*self.sr*ne*self.df.loc[i, "wvlnm"]/sqrt(T_K)
-                # tmp1 =
+# class AtomLinesKurucz(object):
+#
+#     def __init__(self, *, df_file):
+#         self.df = pd.read_pickle(df_file)
+#
+#     def set_wvlnm_rng(self, wvl_nm_l, wvl_nm_u):
+#         self.wvlnm_rng = (wvl_nm_l, wvl_nm_u)
+#
+#     def set_sr(self, sr: float):
+#         self.sr = sr
+#
+#     # def wvl_filter(self, *, wvlnm_rng):
+#     # df = self.df[(self.df["wvlnm"] >= wvlnm_rng[0])* (self.df["wvlnm"] <= wvlnm_rng[1])]
+#     # return df
+#     def set_stark_brdn_DK(self, *, ne: float, T_K: float):
+#         _const = 4.4198201551008605e-39
+#         self.df["stark_brdn"] = 0
+#         for i in self.df.index:
+#             if (self.df.loc[i, "wvlnm"] < self.wvlnm_rng[0]) or (self.df.loc[i, "wvlnm"] >
+#                                                                  self.wvlnm_rng[1]):
+#                 continue
+#             else:
+#                 prtb = self.df.loc[i, "prtb_u"] + self.df.loc[i, "prtb_l"]
+#                 tmp = _const*self.sr*ne*self.df.loc[i, "wvlnm"]/sqrt(T_K)
+#                 # tmp1 =
 
 
 # =============================================================================================== #
@@ -125,6 +125,13 @@ class DipoleTransition(object):
                  self.lin_df.loc[iLn, "g_u"]*exp(-self.lin_df.loc[iLn, "E_u"]*eV2K/T_K)/ \
                  self.spc.qint(T_K)/allSR
         return norm_I
+    
+    def norm_I_tot(self, *, T_K):
+        r""""""
+        I_tot = np.sum(nm2Hz_f(self.lin_df["wvlnm"])*Hz2J*self.lin_df["Aul"] * \
+                self.lin_df["g_u"]*np.exp(-self.lin_df["E_u"]*eV2K/T_K)) / self.spc.qint(T_K)/allSR
+        return I_tot
+    
 
     # ------------------------------------------------------------------------------------------- #
     def lin_R2(self, iLn, drct):
