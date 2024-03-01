@@ -74,7 +74,7 @@ reg = re.compile(r"""
 #     return f"{self.n_lines} lines"
 
 
-# ----------------------------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
 
 # class AtomLinesKurucz(object):
 #
@@ -137,15 +137,15 @@ class _AbsDipoleTransition(object):
                   self.lin.df["g_u"]*np.exp(-self.lin.df["E_u"]*eV2K/T_K))/ \
       self.spc.qint(T_K)/allSR
 
-  # ------------------------------------------------------------------------------------------- #
+  # ------------------------------------------------------------------------- #
   def lin_R2(self, iLn, drct):
     r"""Square of the coordinate operator matrix element,
     in units of the Bohar radius a0^2."""
     rslt = 9.406593480824852e-07*self.lin.df.loc[iLn, "Aul"]/self.lin.df.loc[
       iLn, "dE"]**3
-    if drct == "up":
+    if drct=="up":
       return rslt
-    elif drct == "down":
+    elif drct=="down":
       return rslt*self.lin.df.loc[iLn, "g_u"]/self.lin.df.loc[iLn, "g_l"]
     else:
       raise Exception(drct)
@@ -212,7 +212,7 @@ class _AbsDipoleTransition(object):
                       [0.2, 0.24, 0.33, 0.56, 0.98, 1.33],
                       kind="cubic")(x)
 
-  # ------------------------------------------------------------------------------------------- #
+  # ------------------------------------------------------------------------- #
   def ele_strk_shft_DK(self, iLn, *, comp, T_K):
     wvl = self.lin.df.loc[iLn, "wvlnm"]*nm2m
     prtb = self.shft_prtb_lvl_DK(self.lin.df.loc[iLn, "idx_lLvl"], T_K=T_K) - \
@@ -256,13 +256,14 @@ class _AbsDipoleTransition(object):
     xi = 1.25 if self.spc.Zc > 0 else 0.75
     return ele_strk_brdn*1.75*A*(1 - xi*R)
 
-  # ------------------------------------------------------------------------------------------- #
+  # ------------------------------------------------------------------------- #
   def vdw_brdn(self, iLn, *, comp, T_K: float) -> float:
     wvlnm = self.lin.df.loc[iLn, "wvlnm"]
     n2_u = Ry_eV/(self.spc.ionE - self.lvl_df.loc[
       self.lin.df.loc[iLn, "idx_uLvl"], "E_eV"])
     n2_l = Ry_eV/(self.spc.ionE - self.lvl_df.loc[
-      self.lin.df.loc[iLn, "idx_lLvl"], "E_eV"])
+      self.lin.df.loc[iLn, "idx_lLvl"], "E_eV"])  # TODO
+    assert (n2_u > 0) and (n2_l > 0)
     l_u = self.lvl_df.loc[self.lin.df.loc[iLn, "idx_uLvl"], "l"]
     l_l = self.lvl_df.loc[self.lin.df.loc[iLn, "idx_lLvl"], "l"]
     R2_u = n2_u/2*(5*n2_u + 1 - 3*l_u*(l_u + 1))
@@ -271,7 +272,7 @@ class _AbsDipoleTransition(object):
     # ---
     tmp = 0
     for i in range(comp.n_spcs):
-      if comp.Zc[i] == 0:
+      if comp.Zc[i]==0:
         tmp = tmp + comp.spcs[i].polar**0.4* \
               rdcdM(self.spc.relM, comp.spcs[i].relM)**(-0.3)* \
               comp.nj[i]*comp.spcs[i].gnd_frac(T_K)
@@ -291,7 +292,7 @@ class _AbsDipoleTransition(object):
 
   def loren_brdn(self, iLn, *, comp, T_K, strk_method="DK"):
     # assert strk_method == "DK"
-    if strk_method == "DK":
+    if strk_method=="DK":
       ele_strk = self.ele_strk_brdn_DK(iLn, comp=comp, T_K=T_K)
       ion_strk = self.ion_strk_brdn(iLn, ele_strk_brdn=ele_strk, comp=comp)
       return self.res_brdn(iLn, comp=comp, T_K=T_K) + \
