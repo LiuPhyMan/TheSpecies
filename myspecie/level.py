@@ -9,23 +9,33 @@
 # _const = 64*pi*fs_const*a0**2/3/sqrt(3)
 #
 #
-# class PhotoIonizationCS(object):
-#
-#     def __init__(self, *, spc, lvl_df):
-#         self.spc = spc
-#         self.lvl_df = lvl_df
-#
-#     def norm_cs(self, wvlnm, *, T_K):
-#         _cs = np.zeros_like(wvlnm)
-#         for iLvl in self.lvl_df.index:
-#             pass
-# from math import pi, sqrt, exp
-# import numpy as np
-# from myconst import fine_structure as fs_const, bohr_radius as a0, Ry_eV,
-# nm2Hz_f, Hz2nm_f, eV2K
-#
-#
-# T_K = 10e3
+from math import pi, sqrt
+
+from myconst import fine_structure as fs_const, bohr_radius as a0, Ry_eV as \
+  Ry, nm2eV_f, eV2nm_f
+import numpy as np
+
+from .basic import Levels
+
+
+class PhotoIonizationCS(object):
+  def __init__(self, *, lvl: Levels):
+    self.lvl = lvl
+
+  def cs(self, iLvl, *, spl_wvlnm, ipd):
+    Qn = self.lvl[iLvl, 'Qn']
+    Ebind = self.lvl[iLvl, 'Ebind0'] - ipd
+    if Ebind < 0:
+      return np.zeros_like(spl_wvlnm)
+    else:
+      _const = 64*pi*fs_const*a0**2/3/sqrt(3)
+      tmp = _const*Ebind**2.5*sqrt(Ry)/nm2eV_f(spl_wvlnm)**3
+      tmp[spl_wvlnm > eV2nm_f(Ebind)] = 0
+      return tmp/Qn
+
+  def norm_cs(self):
+    pass
+
 # _const = 64*pi*fs_const*a0**2/3/sqrt(3)
 #
 # nuHz_seq = np.linspace(0.1, 10, num=10000)*1e15

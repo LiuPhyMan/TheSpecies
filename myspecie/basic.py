@@ -28,7 +28,8 @@ class Levels(object):
     self.df = df
 
   def __getitem__(self, _paras):
-    r""" _paras: (index, column)"""
+    r""" _paras: (index, column)
+    access:   lvl[iLvl, column] """
     return self.df.loc[_paras[0], _paras[1]]
 
   def Zi(self, iLvl, *, T_K):
@@ -43,5 +44,10 @@ class Levels(object):
 
 
 def atomStrs(atom, *, maxZc):
+  r"""Generate a list of atom str.
+  e.g.
+  ---
+  [Ar, Ar_1p, Ar_2p, ...]
+  """
   assert maxZc >= 1
   return [atom] + [f"{atom}_{Zc:.0f}p" for Zc in range(1, maxZc + 1)]
