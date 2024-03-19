@@ -20,6 +20,10 @@ class Lines(object):
     r""" _paras: (index, column)"""
     return self.df.loc[_paras[0], _paras[1]]
 
+  @property
+  def index(self):
+    return self.df.index
+
 
 class Levels(object):
   __slots__ = ['df']

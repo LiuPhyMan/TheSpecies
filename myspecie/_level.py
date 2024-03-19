@@ -15,7 +15,7 @@ from myconst import fine_structure as fs_const, bohr_radius as a0, Ry_eV as \
   Ry, nm2eV_f, eV2nm_f
 import numpy as np
 
-from .basic import Levels
+from ._basic import Levels
 
 
 class PhotoIonizationCS(object):

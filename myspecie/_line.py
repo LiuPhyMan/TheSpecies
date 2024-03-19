@@ -1,13 +1,16 @@
 import re
 from math import pi, sqrt, exp
+from typing import overload
 
 import numpy as np
 from myconst import (light_c, nm2m, Ry_eV, cm2m, h, epsilon_0, m_e, e,
                      eV2K, eV2J,
                      K2eV, bohr_radius as a0, fine_structure as fs_const,
                      nm2J_f, allSR, e2_eV)
+from ._spc import _AbsSpecie
 from mymath.basic import Kn
 from mythermo.basic import rdcdM
+# from mythermo import Composition as Comp
 from scipy.interpolate import interp1d
 
 reg = re.compile(r"""
@@ -41,75 +44,13 @@ reg = re.compile(r"""
 #         ----------
 #         file_name
 #         """
-# self._file_name = lineFile
-# with open(lineFile) as f:
-#     lines = f.readlines()
-# data = []
-# columns = ["wvlnm", "Aki", "Ei_eV", "Ek_eV", "Conf", "Term", "J"]
-# -- read file to data -- #
-# for line in lines:
-#     temp = reg.fullmatch(line)
-#     if temp:
-#         data.append([temp.group(_) for _ in columns])
-# self.df = DataFrame(data, columns=columns)
-# -- str to number -- #
-#     self.df["wvlnm"] = self.df["wvlnm"].map(lambda x: float(x))
-#     self.df["Aki"] = self.df["Aki"].map(lambda x: float(x))
-#     self.df["Ei_eV"] = self.df["Ei_eV"].map(lambda x: float(x))
-#     self.df["Ek_eV"] = self.df["Ek_eV"].map(lambda x: float(x))
-#     self.df["J"] = self.df["J"].map(lambda x: float(eval(x)))
-#     self.df["g"] = self.df["J"]*2 + 1
-#     self.df["nu"] = light_c/(self.df["wvlnm"]*nm2m)
-#     self.df["omega"] = 2*pi*self.df["nu"]
-#     self.df["wAg"] = self.df["omega"]*self.df["Aki"]*self.df["g"]
-#     #
-#     self.n_lines = self.df["wvlnm"].size
-#
-# def df_filter_by_wv_range(self, *, wvlnm_rng):
-#     df = self.df[(self.df["wvlnm"] >= wvlnm_rng[0])*(self.df["wvlnm"] <=
-#     wvlnm_rng[1])]
-#     return df
-#
-# def __repr__(self):
-#     return f"{self.n_lines} lines"
-
-
-# --------------------------------------------------------------------------- #
-
-# class AtomLinesKurucz(object):
-#
-#     def __init__(self, *, df_file):
-#         self.df = pd.read_pickle(df_file)
-#
-#     def set_wvlnm_rng(self, wvl_nm_l, wvl_nm_u):
-#         self.wvlnm_rng = (wvl_nm_l, wvl_nm_u)
-#
-#     def set_sr(self, sr: float):
-#         self.sr = sr
-#
-#     # def wvl_filter(self, *, wvlnm_rng):
-#     # df = self.df[(self.df["wvlnm"] >= wvlnm_rng[0])* (self.df["wvlnm"]
-#     <= wvlnm_rng[1])]
-#     # return df
-#     def set_stark_brdn_DK(self, *, ne: float, T_K: float):
-#         _const = 4.4198201551008605e-39
-#         self.df["stark_brdn"] = 0
-#         for i in self.df.index:
-#             if (self.df.loc[i, "wvlnm"] < self.wvlnm_rng[0]) or (
-#             self.df.loc[i, "wvlnm"] >
-#                                                                  self.wvlnm_rng[1]):
-#                 continue
-#             else:
-#                 prtb = self.df.loc[i, "prtb_u"] + self.df.loc[i, "prtb_l"]
-#                 tmp = _const*self.sr*ne*self.df.loc[i, "wvlnm"]/sqrt(T_K)
-#                 # tmp1 =
 
 
 # =========================================================================== #
 class _AbsDipoleTransition(object):
   __slots__ = ['spc', 'lvl', 'lin', 'sr']
 
-  def __init__(self, *, spc, lvl, lin):
+  def __init__(self, *, spc: _AbsSpecie, lvl, lin):
     self.spc = spc
     self.lvl = lvl
     self.lin = lin
@@ -124,24 +65,33 @@ class _AbsDipoleTransition(object):
     return 2/3/pi*(h**2*epsilon_0/m_e/e)**2*tmp
 
   def norm_I(self, iLn, *, T_K):
-    r""" h\nu * Aul * g*exp(-E/kT) / Q_tot / (4*pi)"""
+    r""" h\nu * Aul * g*exp(-E/kT) / Q_tot / (4*pi)
+    unit: W sr^-1"""
     lin_sr = self.lin.df.loc[iLn]
     norm_I = nm2J_f(lin_sr["wvlnm"])*lin_sr["Aul"]* \
-             lin_df["g_u"]*exp(-lin_sr["E_u"]*eV2K/T_K)/ \
+             lin_sr["g_u"]*exp(-lin_sr["E_u"]*eV2K/T_K)/ \
              self.spc.qint(T_K)/allSR
     return norm_I
 
+  def emiss(self, iLn, *, spc_n, T_K):
+    r""" unit: W m^-3 sr^-1"""
+    return spc_n*self.norm_I(iLn, T_K=T_K)
+
   def norm_I_tot(self, *, T_K):
     r""""""
+    _df = self.lin.df
     return np.sum(nm2J_f(self.lin.df["wvlnm"])*self.lin.df["Aul"]* \
                   self.lin.df["g_u"]*np.exp(-self.lin.df["E_u"]*eV2K/T_K))/ \
       self.spc.qint(T_K)/allSR
+
+  def tot_emiss(self, *, spc_n, T_K):
+    return spc_n*self.norm_I_tot(T_K=T_K)
 
   # ------------------------------------------------------------------------- #
   def lin_R2(self, iLn, drct):
     r"""Square of the coordinate operator matrix element,
     in units of the Bohar radius a0^2."""
-    rslt = 9.406593480824852e-07*self.lin.df.loc[iLn, "Aul"]/self.lin.df.loc[
+    rslt = 9.406593480824852e-07*self.lin.df.loc[iLn, "Aul"]/self.lin[
       iLn, "dE"]**3
     if drct=="up":
       return rslt
@@ -151,12 +101,12 @@ class _AbsDipoleTransition(object):
       raise Exception(drct)
 
   def prtb_R2(self, iLvl):
-    lvl = self.lvl_df.loc[iLvl]
+    lvl = self.lvl.df.loc[iLvl]
     return np.array([self.lin_R2(idx, 'up') for idx in lvl["lnIdx_uPrtb"]] + \
                     [self.lin_R2(idx, 'down') for idx in lvl["lnIdx_lPrtb"]])
 
   def prtb_dE(self, iLvl):
-    lvl = self.lvl_df.loc[iLvl]
+    lvl = self.lvl.df.loc[iLvl]
     return np.array(
       [-self.lin.df.loc[idx, "dE"] for idx in lvl["lnIdx_uPrtb"]] + \
       [self.lin.df.loc[idx, "dE"] for idx in lvl["lnIdx_lPrtb"]])
@@ -221,13 +171,6 @@ class _AbsDipoleTransition(object):
       8*Ry_eV/27/(T_K*K2eV))*fs_const*a0**2*wvl**2*prtb
     return shft
 
-  def ele_strk_brdn_DK(self, iLn, *, comp, T_K):
-    prtb = self.prtb_lvl_DK(self.lin.df.loc[iLn, "idx_lLvl"], T_K=T_K) + \
-           self.prtb_lvl_DK(self.lin.df.loc[iLn, "idx_uLvl"], T_K=T_K)
-    HWHM = self.sr*comp.ne*sqrt(8*Ry_eV/27/(T_K*K2eV))*fs_const*a0**2* \
-           (self.lin.df.loc[iLn, "wvlnm"]*nm2m)**2*prtb
-    return 2*HWHM
-
   def ele_strk_shft_Gr(self, iLn, *, comp, T_K):
     wvl = self.lin.df.loc[iLn, "wvlnm"]*nm2m
     prtb = self.shft_prtb_lvl_Gr(self.lin.df.loc[iLn, "idx_uLvl"], T_K=T_K) - \
@@ -235,13 +178,44 @@ class _AbsDipoleTransition(object):
     shft = comp.ne*sqrt(16*pi*Ry_eV/27/(T_K*K2eV))*fs_const*a0**2*wvl**2*prtb
     return shft
 
-  def ele_strk_brdn_Gr(self, iLn, *, comp, T_K):
-    prtb = self.prtb_lvl_Gr(self.lin.df.loc[iLn, "idx_lLvl"], T_K=T_K) + \
-           self.prtb_lvl_Gr(self.lin.df.loc[iLn, "idx_uLvl"], T_K=T_K)
-    HWHM = self.sr*comp.ne*sqrt(16*pi*Ry_eV/27/(T_K*K2eV))*fs_const*a0**2* \
-           (self.lin.df.loc[iLn, "wvlnm"]*nm2m)**2*prtb
+  # ------------------------------------------------------------------------- #
+  @overload
+  def ele_strk_brdn_Gr(self, iLn, *, comp, T_K: float) -> float:
+    pass
+
+  @overload
+  def ele_strk_brdn_Gr(self, iLn, *, ne: float, T_K: float) -> float:
+    pass
+
+  @overload
+  def ele_strk_brdn_DK(self, iLn, *, comp, T_K: float) -> float:
+    pass
+
+  @overload
+  def ele_strk_brdn_DK(self, iLn, *, ne: float, T_K: float) -> float:
+    pass
+
+  def ele_strk_brdn_Gr(self, iLn, **kwargs):
+    assert kwargs.keys()=={"comp", "T_K"} or kwargs.keys()=={"ne", "T_K"}
+    _ne = kwargs["comp"].ne if "comp" in kwargs else kwargs["ne"]
+    T_K = kwargs["T_K"]
+    prtb = self.prtb_lvl_Gr(self.lin[iLn, "idx_lLvl"], T_K=T_K) + \
+           self.prtb_lvl_Gr(self.lin[iLn, "idx_uLvl"], T_K=T_K)
+    HWHM = self.sr*_ne*sqrt(16*pi*Ry_eV/27/(T_K*K2eV))*fs_const*a0**2* \
+           (self.lin[iLn, "wvlnm"]*nm2m)**2*prtb
     return 2*HWHM
 
+  def ele_strk_brdn_DK(self, iLn, **kwargs):
+    assert kwargs.keys()=={"comp", "T_K"} or kwargs.keys()=={"ne", "T_K"}
+    _ne = kwargs["comp"].ne if "comp" in kwargs else kwargs["ne"]
+    T_K = kwargs["T_K"]
+    prtb = self.prtb_lvl_DK(self.lin.df.loc[iLn, "idx_lLvl"], T_K=T_K) + \
+           self.prtb_lvl_DK(self.lin.df.loc[iLn, "idx_uLvl"], T_K=T_K)
+    HWHM = self.sr*_ne*sqrt(8*Ry_eV/27/(T_K*K2eV))*fs_const*a0**2* \
+           (self.lin[iLn, "wvlnm"]*nm2m)**2*prtb
+    return 2*HWHM
+
+  # ------------------------------------------------------------------------- #
   def ion_strk_brdn(self, iLn, *, ele_strk_brdn, comp):
     r"""stark_brdn = 2 * HWHM"""
     wvl = self.lin.df.loc[iLn, "wvlnm"]*nm2m
@@ -258,16 +232,20 @@ class _AbsDipoleTransition(object):
 
   # ------------------------------------------------------------------------- #
   def vdw_brdn(self, iLn, *, comp, T_K: float) -> float:
+    if not self.spc.isNeu():
+      return 0.0
     wvlnm = self.lin.df.loc[iLn, "wvlnm"]
-    n2_u = Ry_eV/(self.spc.ionE - self.lvl_df.loc[
-      self.lin.df.loc[iLn, "idx_uLvl"], "E_eV"])
-    n2_l = Ry_eV/(self.spc.ionE - self.lvl_df.loc[
-      self.lin.df.loc[iLn, "idx_lLvl"], "E_eV"])  # TODO
+    # n2_u = Ry_eV/(self.spc.ionE - self.lvl[self.lin[iLn, "idx_uLvl"], "E_eV"])
+    # n2_l = Ry_eV/(self.spc.ionE - self.lvl[self.lin[iLn, "idx_lLvl"], "E_eV"])
+    n2_u = Ry_eV/self.lvl[self.lin[iLn, 'idx_uLvl'], 'Ebind0']
+    n2_l = Ry_eV/self.lvl[self.lin[iLn, 'idx_lLvl'], 'Ebind0']
     assert (n2_u > 0) and (n2_l > 0)
-    l_u = self.lvl_df.loc[self.lin.df.loc[iLn, "idx_uLvl"], "l"]
-    l_l = self.lvl_df.loc[self.lin.df.loc[iLn, "idx_lLvl"], "l"]
+    l_u = self.lvl[self.lin[iLn, "idx_uLvl"], "l"]
+    l_l = self.lvl[self.lin[iLn, "idx_lLvl"], "l"]
     R2_u = n2_u/2*(5*n2_u + 1 - 3*l_u*(l_u + 1))
     R2_l = n2_l/2*(5*n2_l + 1 - 3*l_l*(l_l + 1))
+    assert R2_u > 0, R2_u
+    assert R2_l > 0, R2_l
     R2 = abs(R2_u - R2_l)
     # ---
     tmp = 0
@@ -291,7 +269,7 @@ class _AbsDipoleTransition(object):
     return self.dpp_brdn(iLn, T_K=T_K)
 
   def loren_brdn(self, iLn, *, comp, T_K, strk_method="DK"):
-    # assert strk_method == "DK"
+    # assert strk_method == "DK" #TODO
     if strk_method=="DK":
       ele_strk = self.ele_strk_brdn_DK(iLn, comp=comp, T_K=T_K)
       ion_strk = self.ion_strk_brdn(iLn, ele_strk_brdn=ele_strk, comp=comp)

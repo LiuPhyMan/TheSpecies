@@ -21,8 +21,8 @@ spec_df = read_csv(str(parentPath/"specie_data.csv"), sep=",", header=None,
 
 
 class _AbsSpecie(object):
-  __slots__ = ["spc_str", "relM", "absM", "Zc", "Hf", "ionE", "polar", "elems",
-               "lines"]
+  __slots__ = ["spc_str", "relM", "absM", "Zc", "Hf", "_ionE", "polar",
+               "elems", "lines"]
 
   def __init__(self, *, spc_str: str) -> None:
     assert spc_str in spec_df.index, spc_str
@@ -32,19 +32,19 @@ class _AbsSpecie(object):
     self.absM = self.relM*relM2absM
     self.Zc = _spc["Zc"]
     self.Hf = _spc["Hf"]
-    self.ionE = None if _spc["ionE"].strip()=="" else float(_spc["ionE"])
+    self._ionE = None if _spc["ionE"].strip()=="" else float(_spc["ionE"])
     self.polar = None if _spc["polar"].strip()=="" else float(_spc["polar"])
     self.elems = {_[0]: int(_[1])
                   for _ in re.findall(r"([a-zA-Z]+)-(\d+)", _spc["elems"])}
 
-  @property
-  def type(self):
-    if self.Zc==0:
-      return "neu"
-    if self.Zc > 0:
-      return "ion"
-    if self.Zc < 0:
-      return "negChrg"
+  def isNeu(self):
+    return True if self.Zc==0 else False
+
+  def isPosIon(self):
+    return True if self.Zc > 0 else False
+
+  def isNegIon(self):
+    return True if self.Zc < 0 else False
 
   def get_nElem(self, element: str):
     if element=="e":
