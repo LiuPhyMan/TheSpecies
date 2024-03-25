@@ -10,6 +10,7 @@ setup(
         "numpy",
         "pandas",
         "scipy",
-        "myconst"
+        "myconst",
+        "mymath"
     ]
 )
